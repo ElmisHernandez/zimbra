@@ -1,31 +1,51 @@
-#################################################################
-# Dockerfile to build Zimbra Collaboration 8.8.15 container images
-# Based on Ubuntu 18.04
-# Created by Jorge de la Cruz
-#################################################################
-FROM ubuntu:18.04
-MAINTAINER Elmis Hernandez <elmis.hernandez@itssfrance.fr>
+FROM ubuntu:16.04
+MAINTAINER Sascha Falk <sascha@falk-online.eu>
 
-RUN echo "resolvconf resolvconf/linkify-resolvconf boolean false" | debconf-set-selections
+# Update image and install additional packages
+# -----------------------------------------------------------------------------
+ENV DEBIAN_FRONTEND=noninteractive
+RUN \
+  apt-get -y update && \
+  apt-get -y install \
+    debootstrap \
+    dnsmasq \
+    iproute2 \
+    iptables \
+    sed && \
+  apt-get -y autoremove && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -y install \
-  wget \
-  dialog \
-  openssh-client \
-  software-properties-common \
-  dnsmasq \
-  dnsutils \
-  net-tools \
-  sudo \
-  rsyslog \
-  unzip
+# Copy prepared files into the image
+# -----------------------------------------------------------------------------
+COPY target /
 
-VOLUME ["/opt/zimbra"]
+RUN \
+  mkdir /data && \
+  chmod 750 /docker-entrypoint.sh
 
-EXPOSE 22 25 465 587 110 143 993 995 80 443 8080 8443 7071
+# Volumes
+# -----------------------------------------------------------------------------
+VOLUME [ "/data" ]
 
-COPY opt /opt/
+# Expose ports
+# -----------------------------------------------------------------------------
+# 25/tcp   - SMTP (for incoming mail)
+# 80/tcp   - HTTP (for web mail clients)
+# 110/tcp  - POP3 (for mail clients)
+# 143/tcp  - IMAP (for mail clients)
+# 443/tcp  - HTTP over TLS (for web mail clients)
+# 465/tcp  - SMTP over SSL (for mail clients)
+# 587/tcp  - SMTP (submission, for mail clients)
+# 993/tcp  - IMAP over TLS (for mail clients)
+# 995/tcp  - POP3 over TLS (for mail clients)
+# 5222/tcp - XMPP
+# 5223/tcp - XMPP (default legacy port)
+# 7071/tcp - HTTPS (admin panel, https://<host>/zimbraAdmin)
+# -----------------------------------------------------------------------------
+EXPOSE 25 80 110 143 443 465 587 993 995 5222 5223 7071
 
-COPY etc /etc/
-
-CMD ["/bin/bash", "/opt/start.sh", "-d"]
+# configure container startup
+# -----------------------------------------------------------------------------
+ENTRYPOINT [ "/docker-entrypoint.sh" ]
+CMD [ "run" ]
